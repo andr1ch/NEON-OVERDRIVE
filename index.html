@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEON OVERDRIVE 3D</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+        body { margin: 0; background: #000; color: #fff; font-family: 'Orbitron', sans-serif; overflow: hidden; touch-action: none; }
+        #game-container { position: relative; width: 100vw; height: 100vh; }
+        
+        /* HUD */
+        #hud { 
+            position: absolute; inset: 0; pointer-events: none; z-index: 10;
+            padding: 20px; display: flex; flex-direction: column; justify-content: space-between;
+        }
+        
+        .hud-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .hud-bottom { display: flex; justify-content: center; align-items: flex-end; padding-bottom: 20px; }
+
+        .stat-box { 
+            background: rgba(0, 10, 20, 0.7); 
+            border: 1px solid #00f2ff; 
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+            padding: 10px 20px; border-radius: 4px;
+            clip-path: polygon(0 0, 100% 0, 100% 70%, 90% 100%, 0 100%);
+            min-width: 100px;
+        }
+        .stat-label { font-size: 10px; color: #00f2ff; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px; }
+        .stat-value { font-size: 24px; font-weight: 900; text-shadow: 0 0 10px #00f2ff; }
+
+        #risk-bonus {
+            position: absolute; top: 75px; right: 20px;
+            color: #ff4444; font-size: 12px; font-weight: 900;
+            text-shadow: 0 0 10px #ff4444;
+            opacity: 0; transition: opacity 0.2s, transform 0.2s;
+            transform: translateY(-10px);
+            pointer-events: none;
+            background: rgba(255, 68, 68, 0.1);
+            padding: 2px 8px; border: 1px solid #ff4444;
+            border-radius: 2px;
+        }
+        #risk-bonus.active { opacity: 1; transform: translateY(0); }
+
+        #combo-container {
+            position: absolute; top: 50%; right: 20px; transform: translateY(-50%);
+            display: flex; flex-direction: column; align-items: flex-end; opacity: 0; transition: opacity 0.3s;
+        }
+        #combo-val { font-size: 48px; color: #ff00ff; text-shadow: 0 0 20px #ff00ff; }
+        #combo-label { font-size: 14px; color: #ff00ff; text-transform: uppercase; }
+
+        /* Floating Alerts */
+        .alert {
+            position: absolute; pointer-events: none; font-weight: 900; text-transform: uppercase;
+            animation: alert-anim 0.8s ease-out forwards; white-space: nowrap;
+        }
+        @keyframes alert-anim {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            20% { transform: translate(-50%, -80%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -150%) scale(1); opacity: 0; }
+        }
+
+        /* Controls */
+        #controls { display: flex; gap: 30px; pointer-events: auto; }
+        .btn { 
+            width: 70px; height: 70px; border-radius: 50%; border: 2px solid #00f2ff;
+            background: rgba(0, 242, 255, 0.1); color: #00f2ff; font-size: 24px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);
+            transition: all 0.1s;
+        }
+        .btn:active { transform: scale(0.9); background: rgba(0, 242, 255, 0.4); }
+        .btn-slow { 
+            width: 160px; border-radius: 10px; border-color: #ff00ff; color: #ff00ff; 
+            font-size: 14px; font-weight: bold; letter-spacing: 2px;
+        }
+        .active-slow { background: #ff00ff !important; color: #000 !important; box-shadow: 0 0 30px #ff00ff; }
+
+        /* Overlays */
+        #overlay { 
+            position: absolute; inset: 0; background: rgba(0,0,0,0.9); 
+            display: none; flex-direction: column; align-items: center; justify-content: center; 
+            text-align: center; z-index: 100; pointer-events: auto;
+        }
+        #overlay h1 { font-size: 64px; color: #ff0055; margin: 0; text-shadow: 0 0 30px #ff0055; }
+        #overlay p { font-size: 18px; color: #00f2ff; margin: 20px 0 40px; }
+        #overlay button { 
+            padding: 20px 60px; background: transparent; border: 2px solid #00f2ff; 
+            color: #00f2ff; font-size: 20px; cursor: pointer; font-family: 'Orbitron';
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.3); transition: all 0.3s;
+        }
+        #overlay button:hover { background: #00f2ff; color: #000; }
+        
+        /* Pause Overlay */
+        #pause-overlay {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.7);
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 150; pointer-events: auto; backdrop-filter: blur(5px);
+        }
+        #pause-overlay h2 { font-size: 48px; color: #00f2ff; margin: 0 0 20px; text-shadow: 0 0 20px #00f2ff; }
+        
+        /* Menu Overlay */
+        #menu-overlay {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.95);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 200; pointer-events: auto;
+        }
+        #menu-overlay h1 { font-size: 72px; color: #00f2ff; margin: 0 0 40px; text-shadow: 0 0 30px #00f2ff; letter-spacing: 10px; }
+        .menu-options { display: flex; flex-direction: column; gap: 20px; width: 300px; }
+        .menu-btn {
+            padding: 15px; background: rgba(0, 242, 255, 0.05); border: 1px solid #00f2ff;
+            color: #00f2ff; font-family: 'Orbitron'; font-size: 16px; cursor: pointer;
+            transition: all 0.3s; text-transform: uppercase; letter-spacing: 2px;
+            clip-path: polygon(0 0, 100% 0, 100% 70%, 95% 100%, 0 100%);
+        }
+        .menu-btn:hover { background: #00f2ff; color: #000; box-shadow: 0 0 20px #00f2ff; }
+        .menu-btn span { display: block; font-size: 10px; opacity: 0.7; margin-top: 5px; }
+
+        /* Scanline Effect */
+        #scanlines {
+            position: absolute; inset: 0; pointer-events: none; z-index: 5;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 4px, 3px 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="scanlines"></div>
+    <div id="hud">
+        <div class="hud-top">
+            <div class="stat-box">
+                <div class="stat-label">Level</div>
+                <div id="lvl-val" class="stat-value">1</div>
+            </div>
+            <div class="stat-box" style="border-color: #ff00ff; box-shadow: 0 0 15px rgba(255, 0, 255, 0.3);">
+                <div class="stat-label" style="color: #ff00ff;">Goal</div>
+                <div id="goal-val" class="stat-value">100</div>
+            </div>
+            <div class="stat-box" id="timer-box" style="display:none; border-color: #ff4444;">
+                <div class="stat-label" style="color: #ff4444;">Time</div>
+                <div id="timer-val" class="stat-value">30</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div id="score-val" class="stat-value">0</div>
+            </div>
+            <div id="risk-bonus">RISK BONUS x2</div>
+        </div>
+
+        <div id="combo-container">
+            <div id="combo-val">x2</div>
+            <div id="combo-label">Combo</div>
+        </div>
+
+        <div class="hud-bottom">
+            <div id="controls">
+                <button class="btn" id="btn-l">L</button>
+                <button class="btn btn-slow" id="btn-s">SLOW-MO</button>
+                <button class="btn" id="btn-r">R</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="overlay">
+        <h1 id="over-title">TERMINATED</h1>
+        <p id="over-msg">System failure detected.</p>
+        <button id="btn-restart">REBOOT SYSTEM</button>
+        <button id="btn-menu-back" style="margin-top: 20px; font-size: 14px; padding: 10px 30px;">MAIN MENU</button>
+    </div>
+
+    <div id="pause-overlay">
+        <h2>PAUSED</h2>
+        <div class="menu-options" style="width: 250px;">
+            <button class="menu-btn" id="btn-resume">RESUME</button>
+            <button class="menu-btn" id="btn-pause-restart">RESTART</button>
+            <button class="menu-btn" id="btn-pause-menu">MAIN MENU</button>
+            <button class="menu-btn" id="mute-btn" style="margin-top: 20px;">SOUND: ON</button>
+        </div>
+    </div>
+
+    <div id="menu-overlay">
+        <h1>NEON OVERDRIVE</h1>
+        <div class="menu-options">
+            <button class="menu-btn" onclick="startLevel(1)">
+                Level 1: Standard
+                <span>Default traffic flow</span>
+            </button>
+            <button class="menu-btn" onclick="startLevel(2)">
+                Level 2: Oncoming
+                <span>2 lanes oncoming, 2 lanes forward</span>
+            </button>
+            <button class="menu-btn" onclick="startLevel(3)">
+                Level 3: Time Trial
+                <span>Oncoming traffic + Score goal + Timer</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- ENGINE SETUP ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x020205);
+    scene.fog = new THREE.FogExp2(0x020205, 0.015);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ 
+        antialias: false, 
+        powerPreference: "high-performance" 
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.getElementById('game-container').appendChild(renderer.domElement);
+
+    // Procedural Glow Texture
+    const glowCanvas = document.createElement('canvas');
+    glowCanvas.width = 64; glowCanvas.height = 64;
+    const gCtx = glowCanvas.getContext('2d');
+    const grad = gCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.5, 'rgba(255,255,255,0.6)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    gCtx.fillStyle = grad;
+    gCtx.fillRect(0, 0, 64, 64);
+    const glowTexture = new THREE.CanvasTexture(glowCanvas);
+
+    // --- LIGHTING ---
+    const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+    scene.add(ambient);
+
+    const hemisphereLight = new THREE.HemisphereLight(0x00f2ff, 0xff00ff, 1.0);
+    scene.add(hemisphereLight);
+
+    const mainLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    mainLight.position.set(0, 50, 20);
+    scene.add(mainLight);
+
+    // Add a light that follows the player slightly for visibility
+    const playerLight = new THREE.PointLight(0xffffff, 1, 30);
+    scene.add(playerLight);
+
+    // --- CONSTANTS ---
+    const LANES = 4;
+    const LANE_W = 5;
+    const ROAD_W = LANES * LANE_W;
+    const ROAD_L = 1000;
+
+    // --- ROAD & ENVIRONMENT ---
+    const roadGeo = new THREE.PlaneGeometry(ROAD_W, ROAD_L);
+    const roadMat = new THREE.MeshStandardMaterial({ 
+        color: 0x0a0a0f, 
+        roughness: 0.1, 
+        metalness: 0.5 
+    });
+    const road = new THREE.Mesh(roadGeo, roadMat);
+    road.rotation.x = -Math.PI / 2;
+    road.position.z = -ROAD_L / 2 + 50;
+    scene.add(road);
+
+    // Neon road lines
+    const lineGeo = new THREE.PlaneGeometry(0.1, ROAD_L);
+    const lineMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff });
+    for (let i = 0; i <= LANES; i++) {
+        const line = new THREE.Mesh(lineGeo, lineMat);
+        line.rotation.x = -Math.PI / 2;
+        line.position.set(-ROAD_W/2 + i * LANE_W, 0.02, -ROAD_L/2 + 50);
+        scene.add(line);
+    }
+
+    // Procedural City (Optimized with InstancedMesh)
+    const buildingCount = Math.floor(ROAD_L / 40) * 2;
+    const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
+    const buildingMat = new THREE.MeshStandardMaterial({ color: 0x05050a });
+    const cityMesh = new THREE.InstancedMesh(buildingGeo, buildingMat, buildingCount);
+    scene.add(cityMesh);
+
+    const buildingData = [];
+    const dummy = new THREE.Object3D();
+
+    for (let i = 0; i < buildingCount; i++) {
+        const side = i % 2 === 0 ? -1 : 1;
+        const z = -Math.floor(i / 2) * 40;
+        const x = side * (30 + Math.random() * 20);
+        const h = 20 + Math.random() * 60;
+        const w = 10 + Math.random() * 15;
+        const d = 10 + Math.random() * 15;
+
+        dummy.position.set(x, h/2, z);
+        dummy.scale.set(w, h, d);
+        dummy.updateMatrix();
+        cityMesh.setMatrixAt(i, dummy.matrix);
+        
+        buildingData.push({ id: i, x, h, z, w, d });
+    }
+    cityMesh.instanceMatrix.needsUpdate = true;
+
+    // --- GEOMETRY & MATERIAL CACHE ---
+    const GEOS = {
+        chassis: new THREE.BoxGeometry(2.4, 0.6, 5.0),
+        cabin: new THREE.BoxGeometry(2.0, 0.6, 2.5),
+        spoiler: new THREE.BoxGeometry(2.2, 0.1, 0.5),
+        stripe: new THREE.BoxGeometry(0.1, 0.2, 4.8),
+        wheel: new THREE.CylinderGeometry(0.45, 0.45, 0.4, 16),
+        rim: new THREE.RingGeometry(0.25, 0.35, 16),
+        light: new THREE.BoxGeometry(0.8, 0.2, 0.1),
+        underglow: new THREE.PlaneGeometry(5, 8)
+    };
+
+    const MATS = {
+        playerBody: new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8, roughness: 0.2 }),
+        enemyBody: new THREE.MeshStandardMaterial({ color: 0x151515, metalness: 0.8, roughness: 0.2 }),
+        wheel: new THREE.MeshStandardMaterial({ color: 0x050505 }),
+        cabinBase: new THREE.MeshBasicMaterial({ 
+            color: 0xffffff, 
+            transparent: true, 
+            opacity: 0.8
+        }),
+        stripeMat: new THREE.MeshBasicMaterial({ 
+            color: 0xffffff
+        }),
+        enemyLight: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+        underglowMat: new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            map: glowTexture,
+            transparent: true,
+            opacity: 1.0,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        })
+    };
+
+    // --- CAR MODELS ---
+    function createCyberCar(color, isPlayer) {
+        const group = new THREE.Group();
+        
+        // Chassis
+        const body = new THREE.Mesh(GEOS.chassis, isPlayer ? MATS.playerBody : MATS.enemyBody);
+        body.position.y = 0.5;
+        group.add(body);
+
+        // Cabin
+        const cabinMat = MATS.cabinBase.clone();
+        cabinMat.color.set(color);
+        const cabin = new THREE.Mesh(GEOS.cabin, cabinMat);
+        cabin.position.set(0, 0.9, 0.3);
+        cabin.rotation.x = -0.15; // Sloped forward
+        group.add(cabin);
+
+        // Spoiler
+        const spoiler = new THREE.Mesh(GEOS.spoiler, isPlayer ? MATS.playerBody : MATS.enemyBody);
+        spoiler.position.set(0, 1.0, 2.1);
+        group.add(spoiler);
+
+        // Neon Accents (Side stripes)
+        const neonMat = MATS.stripeMat.clone();
+        neonMat.color.set(color);
+        const s1 = new THREE.Mesh(GEOS.stripe, neonMat);
+        s1.position.set(1.25, 0.5, 0);
+        group.add(s1);
+        const s2 = new THREE.Mesh(GEOS.stripe, neonMat);
+        s2.position.set(-1.25, 0.5, 0);
+        group.add(s2);
+
+        // Wheels
+        const wheelPos = [[-1.1, 0.45, 1.6], [1.1, 0.45, 1.6], [-1.1, 0.45, -1.6], [1.1, 0.45, -1.6]];
+        wheelPos.forEach(p => {
+            const w = new THREE.Mesh(GEOS.wheel, MATS.wheel);
+            w.rotation.z = Math.PI/2;
+            w.position.set(...p);
+            group.add(w);
+            
+            // Rim Glow
+            const rimMat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
+            const rim = new THREE.Mesh(GEOS.rim, rimMat);
+            rim.position.set(p[0] > 0 ? 0.21 : -0.21, 0, 0);
+            rim.rotation.y = Math.PI/2;
+            w.add(rim);
+        });
+
+        // Underglow
+        const ugMat = MATS.underglowMat.clone();
+        ugMat.color.set(color);
+        const ug = new THREE.Mesh(GEOS.underglow, ugMat);
+        ug.rotation.x = -Math.PI / 2;
+        ug.position.y = 0.1;
+        group.add(ug);
+
+        // Headlights
+        const headMesh = new THREE.Mesh(GEOS.light, new THREE.MeshBasicMaterial({ color: isPlayer ? 0x00f2ff : 0xffffff }));
+        headMesh.position.set(0, 0.6, -2.5);
+        group.add(headMesh);
+
+        return group;
+    }
+
+    const player = createCyberCar(0x00f2ff, true);
+    // Shift all parts forward so the pivot (0,0,0) is at the rear axle
+    player.children.forEach(c => {
+        if (c.position) c.position.z -= 1.6;
+    });
+    scene.add(player);
+
+    // --- CAR MODELS (Optimized with InstancedMesh) ---
+    const MAX_ENEMIES = 400;
+    const enemyBodyMesh = new THREE.InstancedMesh(GEOS.chassis, MATS.enemyBody, MAX_ENEMIES);
+    const enemyCabinMesh = new THREE.InstancedMesh(GEOS.cabin, MATS.cabinBase, MAX_ENEMIES);
+    const enemySpoilerMesh = new THREE.InstancedMesh(GEOS.spoiler, MATS.enemyBody, MAX_ENEMIES);
+    const enemyStripeLMesh = new THREE.InstancedMesh(GEOS.stripe, MATS.stripeMat, MAX_ENEMIES);
+    const enemyStripeRMesh = new THREE.InstancedMesh(GEOS.stripe, MATS.stripeMat, MAX_ENEMIES);
+    const enemyLightMesh = new THREE.InstancedMesh(GEOS.light, MATS.enemyLight, MAX_ENEMIES);
+    const enemyUnderglowMesh = new THREE.InstancedMesh(GEOS.underglow, MATS.underglowMat, MAX_ENEMIES);
+    
+    // Pre-allocate color buffers to avoid lazy-init issues
+    const colorArray = new Float32Array(MAX_ENEMIES * 3).fill(1);
+    [enemyCabinMesh, enemyStripeLMesh, enemyStripeRMesh, enemyLightMesh, enemyUnderglowMesh].forEach(m => {
+        m.instanceColor = new THREE.InstancedBufferAttribute(colorArray, 3);
+    });
+
+    scene.add(enemyBodyMesh);
+    scene.add(enemyCabinMesh);
+    scene.add(enemySpoilerMesh);
+    scene.add(enemyStripeLMesh);
+    scene.add(enemyStripeRMesh);
+    scene.add(enemyLightMesh);
+    scene.add(enemyUnderglowMesh);
+
+    const enemyDummy = new THREE.Object3D();
+
+    function spawnEnemy(zOverride = null) {
+        if (state.enemies.length >= MAX_ENEMIES) return;
+        
+        const spawnZ = zOverride !== null ? zOverride : -400;
+        
+        // Find all available lanes
+        const availableLanes = [];
+        for (let i = 0; i < LANES; i++) {
+            // Find the car closest to spawn in this lane
+            let minZ = 1000;
+            state.enemies.forEach(e => {
+                if (e.laneIdx === i) minZ = Math.min(minZ, e.z);
+            });
+
+            // If the closest car is far enough from spawn, we can spawn a new one
+            if (minZ > spawnZ + 60) {
+                availableLanes.push(i);
+            }
+        }
+
+        if (availableLanes.length > 0) {
+            const laneIdx = availableLanes[Math.floor(Math.random() * availableLanes.length)];
+            const color = [0xff00ff, 0x00ff00, 0xffff00][Math.floor(Math.random() * 3)];
+            
+            let isOncoming = false;
+            let speed = (30 + Math.random() * 30) * state.speedMult; // Base speed for forward cars
+
+            if (state.lvl === 1) {
+                isOncoming = false; // Level 1: Strictly forward
+                speed = (40 + Math.random() * 40) * state.speedMult;
+            } else if (state.lvl === 2 || state.lvl === 3) {
+                if (laneIdx < 2) {
+                    isOncoming = true;
+                    speed = (120 + Math.random() * 60) * state.speedMult; // Faster oncoming
+                } else {
+                    isOncoming = false;
+                    speed = (40 + Math.random() * 30) * state.speedMult; // Slower forward
+                }
+            }
+
+            // Ensure at least one lane is clear at this Z distance to prevent blocking
+            // We do this by checking if other lanes are occupied at a similar Z
+            let carsAtSameZ = 0;
+            state.enemies.forEach(e => {
+                if (Math.abs(e.z - spawnZ) < 15) carsAtSameZ++;
+            });
+            
+            // If 3 lanes are already occupied at this Z, don't spawn in the 4th
+            if (carsAtSameZ >= LANES - 1) return;
+
+            state.enemies.push({ 
+                laneIdx, 
+                z: spawnZ, 
+                x: (laneIdx - 1.5) * LANE_W,
+                speed, 
+                color: new THREE.Color(color), 
+                isOncoming,
+                nearMissed: false 
+            });
+        }
+    }
+
+    // --- SPEED PARTICLES ---
+    const partCount = 100;
+    const partGeo = new THREE.BufferGeometry();
+    const partPos = new Float32Array(partCount * 3);
+    for(let i=0; i<partCount; i++) {
+        partPos[i*3] = (Math.random() - 0.5) * 100;
+        partPos[i*3+1] = Math.random() * 20;
+        partPos[i*3+2] = (Math.random() - 0.5) * 500;
+    }
+    partGeo.setAttribute('position', new THREE.BufferAttribute(partPos, 3));
+    const partMat = new THREE.PointsMaterial({ color: 0x00f2ff, size: 0.1, transparent: true, opacity: 0.5 });
+    const particles = new THREE.Points(partGeo, partMat);
+    scene.add(particles);
+
+    // --- GAME STATE ---
+    let state = {
+        lvl: 1, score: 0, time: 30,
+        lane: 2, targetLane: 2,
+        enemies: [], isSlow: false, over: false, inMenu: true, paused: false,
+        lastT: 0, spawnT: 0, elapsed: 0,
+        combo: 0, comboT: 0,
+        shake: 0,
+        speedMult: 1,
+        goal: 100
+    };
+
+    const UI = {
+        score: document.getElementById('score-val'),
+        lvl: document.getElementById('lvl-val'),
+        goal: document.getElementById('goal-val'),
+        time: document.getElementById('timer-val'),
+        tBox: document.getElementById('timer-box'),
+        combo: document.getElementById('combo-val'),
+        comboCont: document.getElementById('combo-container'),
+        over: document.getElementById('overlay'),
+        restart: document.getElementById('btn-restart'),
+        menu: document.getElementById('menu-overlay'),
+        backToMenu: document.getElementById('btn-menu-back'),
+        risk: document.getElementById('risk-bonus'),
+        pause: document.getElementById('pause-overlay'),
+        resume: document.getElementById('btn-resume'),
+        pauseRestart: document.getElementById('btn-pause-restart'),
+        pauseMenu: document.getElementById('btn-pause-menu'),
+        mute: document.getElementById('mute-btn')
+    };
+
+    // --- AUDIO SYSTEM ---
+    const Audio = (() => {
+        let ctx = null;
+        let masterGain = null;
+        let engineOsc = null;
+        let engineOsc2 = null;
+        let engineFilter = null;
+        let engineGain = null;
+        let muted = false;
+        
+        let bgmInterval = null;
+        let bgmStep = 0;
+
+        const init = () => {
+            if (ctx) return;
+            try {
+                ctx = new (window.AudioContext || window.webkitAudioContext)();
+                masterGain = ctx.createGain();
+                masterGain.connect(ctx.destination);
+                masterGain.gain.value = 0.15;
+                
+                // Engine setup
+                engineFilter = ctx.createBiquadFilter();
+                engineFilter.type = 'lowpass';
+                engineFilter.frequency.value = 300;
+                engineFilter.Q.value = 0.5;
+
+                engineOsc = ctx.createOscillator();
+                engineOsc.type = 'triangle'; 
+                
+                engineOsc2 = ctx.createOscillator();
+                engineOsc2.type = 'sine'; 
+                engineOsc2.detune.value = -1200; 
+
+                engineGain = ctx.createGain();
+                engineGain.gain.value = 0;
+                
+                engineOsc.connect(engineFilter);
+                engineOsc2.connect(engineFilter);
+                engineFilter.connect(engineGain);
+                engineGain.connect(masterGain);
+                
+                engineOsc.start();
+                engineOsc2.start();
+            } catch (e) {
+                console.error("Audio init failed:", e);
+            }
+        };
+
+        const playKick = (time) => {
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.frequency.setValueAtTime(150, time);
+            osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.5);
+            g.gain.setValueAtTime(0.3, time);
+            g.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
+            osc.connect(g);
+            g.connect(masterGain);
+            osc.start(time);
+            osc.stop(time + 0.5);
+        };
+
+        const playHat = (time) => {
+            const bufferSize = ctx.sampleRate * 0.05;
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            
+            const source = ctx.createBufferSource();
+            source.buffer = buffer;
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.value = 8000;
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0.05, time);
+            g.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+            source.connect(filter);
+            filter.connect(g);
+            g.connect(masterGain);
+            source.start(time);
+        };
+
+        const playBass = (freq, time, duration) => {
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            const f = ctx.createBiquadFilter();
+            f.type = 'lowpass';
+            f.frequency.value = 400;
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, time);
+            g.gain.setValueAtTime(0, time);
+            g.gain.linearRampToValueAtTime(0.06, time + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, time + duration);
+            osc.connect(f);
+            f.connect(g);
+            g.connect(masterGain);
+            osc.start(time);
+            osc.stop(time + duration);
+        };
+
+        const playBGMStep = () => {
+            if (!ctx || muted || state.paused || state.over || state.inMenu) return;
+            const now = ctx.currentTime;
+            const stepTime = 0.125; // 16th notes at 120 BPM
+            
+            // Kick on 1 and 3
+            if (bgmStep % 8 === 0 || bgmStep % 8 === 4) playKick(now);
+            
+            // Hats on all 8ths
+            if (bgmStep % 2 === 0) playHat(now);
+            
+            // Driving Bassline (E1)
+            const bassFreq = 41.20;
+            const pattern = [1, 1, 0, 1, 1, 1, 0, 1];
+            if (pattern[bgmStep % 8]) {
+                const f = bgmStep % 16 > 12 ? bassFreq * 1.2 : bassFreq;
+                playBass(f, now, stepTime * 0.8);
+            }
+
+            // Atmospheric Arp
+            if (bgmStep % 32 === 0) {
+                const notes = [164.81, 196.00, 220.00, 246.94]; // E3, G3, A3, B3
+                notes.forEach((f, i) => {
+                    const time = now + i * stepTime * 2;
+                    const osc = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(f, time);
+                    g.gain.setValueAtTime(0, time);
+                    g.gain.linearRampToValueAtTime(0.03, time + 0.1);
+                    g.gain.exponentialRampToValueAtTime(0.001, time + 1.0);
+                    osc.connect(g);
+                    g.connect(masterGain);
+                    osc.start(time);
+                    osc.stop(time + 1.2);
+                });
+            }
+
+            bgmStep++;
+        };
+
+        const playEngine = (speed, isSlow) => {
+            if (!ctx || muted) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            
+            const baseFreq = isSlow ? 30 : 50;
+            const targetFreq = baseFreq + speed * 10;
+            
+            engineOsc.frequency.setTargetAtTime(targetFreq, ctx.currentTime, 0.2);
+            engineOsc2.frequency.setTargetAtTime(targetFreq, ctx.currentTime, 0.2);
+            
+            engineFilter.frequency.setTargetAtTime(isSlow ? 150 : 300 + speed * 50, ctx.currentTime, 0.2);
+            engineGain.gain.setTargetAtTime(isSlow ? 0.03 : 0.05, ctx.currentTime, 0.2);
+        };
+
+        const stopEngine = () => {
+            if (engineGain) engineGain.gain.setTargetAtTime(0, ctx.currentTime, 0.2);
+        };
+
+        const playSFX = (freq, type, duration, volume = 0.15) => {
+            if (!ctx || muted) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            const f = ctx.createBiquadFilter();
+            
+            f.type = 'lowpass';
+            f.frequency.value = freq * 1.5;
+            
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            g.gain.setValueAtTime(volume, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+            
+            osc.connect(f);
+            f.connect(g);
+            g.connect(masterGain);
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        };
+
+        return {
+            init,
+            engine: playEngine,
+            stopEngine,
+            playBGM: () => {
+                if (bgmInterval) return;
+                bgmStep = 0;
+                bgmInterval = setInterval(playBGMStep, 125);
+            },
+            pauseBGM: () => {
+                // Procedural BGM just stops stepping
+            },
+            stopBGM: () => {
+                if (bgmInterval) clearInterval(bgmInterval);
+                bgmInterval = null;
+            },
+            nearMiss: () => playSFX(600, 'sine', 0.3, 0.2),
+            collision: () => playSFX(60, 'triangle', 0.8, 0.4),
+            click: () => playSFX(300, 'sine', 0.1, 0.05),
+            win: () => {
+                playSFX(440, 'sine', 0.2, 0.15);
+                setTimeout(() => playSFX(554.37, 'sine', 0.2, 0.15), 150);
+                setTimeout(() => playSFX(659.25, 'sine', 0.4, 0.15), 300);
+            },
+            toggleMute: () => {
+                muted = !muted;
+                if (masterGain) masterGain.gain.value = muted ? 0 : 0.2;
+                UI.mute.innerText = muted ? 'SOUND: OFF' : 'SOUND: ON';
+                return muted;
+            }
+        };
+    })();
+
+    const alertPool = [];
+    function showAlert(text, color) {
+        const el = alertPool.length > 0 ? alertPool.pop() : document.createElement('div');
+        el.className = 'alert';
+        el.innerText = text;
+        el.style.color = color;
+        el.style.left = '50%';
+        el.style.top = '40%';
+        el.style.display = 'block';
+        document.body.appendChild(el);
+        setTimeout(() => {
+            el.remove();
+            alertPool.push(el);
+        }, 1000);
+    }
+
+    function initLevel(l) {
+        state.lvl = l;
+        state.over = false;
+        state.inMenu = false;
+        state.elapsed = 0;
+        state.enemies = [];
+        state.score = 0;
+        state.combo = 0;
+        state.comboT = 0;
+        state.targetLane = 2;
+        state.spawnT = 0;
+        state.speedMult = 1 + (l - 1) * 0.2;
+        
+        player.position.set(0, 0, 1.6);
+        player.rotation.set(0, 0, 0);
+        
+        // Pre-populate with some enemies
+        for(let i=0; i<15; i++) {
+            spawnEnemy(-50 - i * 40);
+        }
+
+        UI.over.style.display = 'none';
+        UI.menu.style.display = 'none';
+        UI.lvl.innerText = l;
+        UI.score.innerText = "0";
+        UI.comboCont.style.opacity = '0';
+        UI.risk.classList.remove('active');
+
+        if (l === 1) { 
+            showAlert("LEVEL 1: STANDARD", "#00f2ff"); 
+            state.goal = 500;
+            UI.goal.innerText = state.goal;
+            UI.tBox.style.display = 'none';
+        }
+        if (l === 2) { 
+            showAlert("LEVEL 2: ONCOMING", "#ff00ff"); 
+            state.goal = 1000;
+            UI.goal.innerText = state.goal;
+            UI.tBox.style.display = 'none';
+        }
+        if (l === 3) { 
+            showAlert("LEVEL 3: TIME TRIAL", "#ff4444"); 
+            state.goal = 1500;
+            state.time = 60;
+            UI.goal.innerText = state.goal;
+            UI.time.innerText = state.time;
+            UI.tBox.style.display = 'block';
+        }
+    }
+
+    function startLevel(l) {
+        Audio.init();
+        Audio.playBGM();
+        initLevel(l);
+        state.lastT = performance.now();
+        requestAnimationFrame(loop);
+    }
+
+    function showMenu() {
+        state.over = true;
+        state.inMenu = true;
+        state.paused = false;
+        Audio.stopEngine();
+        Audio.stopBGM();
+        UI.over.style.display = 'none';
+        UI.pause.style.display = 'none';
+        UI.menu.style.display = 'flex';
+    }
+
+    function togglePause() {
+        if (state.over || state.inMenu) return;
+        state.paused = !state.paused;
+        if (state.paused) {
+            Audio.stopEngine();
+            Audio.pauseBGM();
+        } else {
+            Audio.playBGM();
+        }
+        UI.pause.style.display = state.paused ? 'flex' : 'none';
+        if (!state.paused) {
+            state.lastT = performance.now();
+            requestAnimationFrame(loop);
+        }
+    }
+
+
+    function loop(t) {
+        if (state.over || state.inMenu || state.paused) return;
+        const dt = Math.min(0.1, (t - state.lastT) / 1000);
+        state.lastT = t;
+
+        const factor = state.isSlow ? 0.25 : 1;
+        
+        // Level logic (Timer for Level 3)
+        if (state.lvl === 3) {
+            state.time -= dt * factor;
+            UI.time.innerText = Math.ceil(Math.max(0, state.time));
+            if (state.time <= 0) {
+                if (state.score >= state.goal) {
+                    gameOver("MISSION COMPLETE", "Target score reached in time!");
+                } else {
+                    gameOver("TIME EXPIRED", "Failed to reach target score.");
+                }
+                return;
+            }
+        }
+
+        // Win condition check for all levels (REMOVED FROM HERE)
+        
+        // Optimize: Instead of expensive CSS filters, we change fog and light intensity
+        if (state.isSlow) {
+            scene.fog.color.set(0x111122);
+            ambient.intensity = 0.5;
+        } else {
+            scene.fog.color.set(0x020205);
+            ambient.intensity = 1.2;
+        }
+
+        // Scoring & Combo
+        if (!state.isSlow) {
+            let scoreGain = 20 * dt * (1 + state.combo * 0.5);
+            
+            // Double points for driving in oncoming lanes (0 and 1) in Level 2 and 3
+            const isOncomingLane = (state.lvl === 2 || state.lvl === 3) && state.targetLane < 2;
+            if (isOncomingLane) {
+                scoreGain *= 2;
+                UI.risk.classList.add('active');
+            } else {
+                UI.risk.classList.remove('active');
+            }
+            
+            state.score += scoreGain;
+            
+            if (state.comboT > 0) {
+                state.comboT -= dt;
+                if (state.comboT <= 0) {
+                    state.combo = 0;
+                    UI.comboCont.style.opacity = '0';
+                }
+            }
+        } else {
+            // In slow-mo, hide risk bonus indicator
+            UI.risk.classList.remove('active');
+        }
+
+        // Always update score UI to reflect Near Miss bonuses even in slow-mo
+        UI.score.innerText = Math.floor(state.score);
+
+        Audio.engine(state.speedMult, state.isSlow);
+
+        // Level Progression (REMOVED OLD LOGIC)
+        
+        // Player Movement & Camera
+        const targetX = (state.targetLane - 1.5) * LANE_W;
+        const prevX = player.position.x;
+        
+        // 1. Steering Intent (Yaw) 
+        // Reduced multiplier and lerp speed for a more graceful, less "aggressive" turn
+        const steeringIntent = (targetX - player.position.x);
+        const targetYaw = -steeringIntent * 0.18; 
+        
+        // Smoother lerp for rotation
+        player.rotation.y += (targetYaw - player.rotation.y) * 8 * dt;
+        
+        // 2. Position Update 
+        // Slightly slower movement to match the smoother rotation
+        player.position.x += (targetX - player.position.x) * 5.5 * dt;
+        
+        // 3. Roll (Banking) 
+        const vx = (player.position.x - prevX) / dt;
+        const targetRoll = -vx * 0.01;
+        player.rotation.z += (targetRoll - player.rotation.z) * 6 * dt;
+        
+        // Subtle engine vibration
+        player.rotation.x = Math.sin(t * 0.005) * 0.01;
+
+        // Dynamic Camera
+        camera.position.x = player.position.x * 0.8 + (Math.random() - 0.5) * state.shake;
+        camera.position.y = 8 + (Math.random() - 0.5) * state.shake;
+        camera.position.z = 18;
+        camera.lookAt(player.position.x, 0, -10);
+        camera.updateProjectionMatrix();
+        
+        // Update player light position
+        playerLight.position.set(player.position.x, 5, player.position.z - 5);
+        
+        if (state.shake > 0) state.shake *= 0.9;
+
+        // Spawning
+        state.spawnT += dt * factor;
+        const spawnRate = 0.08 / state.speedMult; // Much faster spawn rate
+        if (state.spawnT > spawnRate) {
+            spawnEnemy();
+            state.spawnT = 0;
+        }
+
+        // Environment Movement (Instanced)
+        buildingData.forEach(b => {
+            b.z += 80 * factor * dt;
+            if (b.z > 50) b.z = -ROAD_L + 50;
+            
+            dummy.position.set(b.x, b.h/2, b.z);
+            dummy.scale.set(b.w, b.h, b.d);
+            dummy.updateMatrix();
+            cityMesh.setMatrixAt(b.id, dummy.matrix);
+        });
+        cityMesh.instanceMatrix.needsUpdate = true;
+
+        // Particles Update
+        const pPos = particles.geometry.attributes.position.array;
+        for(let i=0; i<partCount; i++) {
+            pPos[i*3+2] += 150 * factor * dt;
+            if(pPos[i*3+2] > 50) pPos[i*3+2] = -450;
+        }
+        particles.geometry.attributes.position.needsUpdate = true;
+
+        // Enemies Update (Instanced)
+        for (let i = state.enemies.length - 1; i >= 0; i--) {
+            const e = state.enemies[i];
+            e.z += e.speed * factor * dt;
+            
+            // Reset dummy for each enemy to avoid rotation bleed
+            enemyDummy.rotation.set(0, e.isOncoming ? Math.PI : 0, 0);
+            enemyDummy.scale.set(1, 1, 1);
+
+            // Body
+            enemyDummy.position.set(e.x, 0.5, e.z);
+            enemyDummy.updateMatrix();
+            enemyBodyMesh.setMatrixAt(i, enemyDummy.matrix);
+
+            // Stripes Left
+            enemyDummy.position.set(e.x + 1.25, 0.5, e.z);
+            enemyDummy.updateMatrix();
+            enemyStripeLMesh.setMatrixAt(i, enemyDummy.matrix);
+            enemyStripeLMesh.setColorAt(i, e.color);
+
+            // Stripes Right
+            enemyDummy.position.set(e.x - 1.25, 0.5, e.z);
+            enemyDummy.updateMatrix();
+            enemyStripeRMesh.setMatrixAt(i, enemyDummy.matrix);
+            enemyStripeRMesh.setColorAt(i, e.color);
+
+            // Cabin
+            enemyDummy.position.set(e.x, 0.9, e.z + (e.isOncoming ? -0.3 : 0.3));
+            enemyDummy.rotation.x = e.isOncoming ? 0.15 : -0.15;
+            enemyDummy.updateMatrix();
+            enemyCabinMesh.setMatrixAt(i, enemyDummy.matrix);
+            enemyCabinMesh.setColorAt(i, e.color);
+
+            // Spoiler
+            enemyDummy.position.set(e.x, 1.0, e.z + (e.isOncoming ? -2.1 : 2.1));
+            enemyDummy.rotation.x = 0;
+            enemyDummy.updateMatrix();
+            enemySpoilerMesh.setMatrixAt(i, enemyDummy.matrix);
+
+            // Headlights
+            enemyDummy.position.set(e.x, 0.6, e.z + (e.isOncoming ? 2.5 : -2.5));
+            enemyDummy.updateMatrix();
+            enemyLightMesh.setMatrixAt(i, enemyDummy.matrix);
+            enemyLightMesh.setColorAt(i, e.isOncoming ? new THREE.Color(0xffffff) : new THREE.Color(0xff4400));
+
+            // Underglow (Rotated flat on ground)
+            enemyDummy.position.set(e.x, 0.1, e.z);
+            enemyDummy.rotation.x = -Math.PI / 2;
+            enemyDummy.updateMatrix();
+            enemyUnderglowMesh.setMatrixAt(i, enemyDummy.matrix);
+            enemyUnderglowMesh.setColorAt(i, e.color);
+
+            const dx = Math.abs(player.position.x - e.x);
+            const dz = Math.abs((player.position.z - 1.6) - e.z);
+
+            // Near Miss Detection
+            if (!e.nearMissed && dz < 4 && dx < 3.5 && dx > 1.8) {
+                e.nearMissed = true;
+                Audio.nearMiss();
+                state.combo++;
+                state.comboT = 3.0; // Increased combo time
+                state.score += 100 * state.combo; // Increased flat bonus
+                state.shake = 0.8;
+                UI.combo.innerText = `x${state.combo}`;
+                UI.comboCont.style.opacity = '1';
+                showAlert("NEAR MISS", "#ff00ff");
+                
+                // Visual Flash for Near Miss
+                renderer.setClearColor(0x440044);
+                setTimeout(() => renderer.setClearColor(0x020205), 50);
+            }
+
+            // Collision
+            if (dx < 1.8 && dz < 4) {
+                state.shake = 2.0;
+                gameOver("CRITICAL FAILURE", "Collision detected. System offline.");
+            }
+
+            if (e.z > 50) {
+                state.enemies.splice(i, 1);
+            }
+        }
+
+        // Set counts AFTER removal to ensure GPU buffer matches current active enemies
+        enemyBodyMesh.count = state.enemies.length;
+        enemyCabinMesh.count = state.enemies.length;
+        enemySpoilerMesh.count = state.enemies.length;
+        enemyStripeLMesh.count = state.enemies.length;
+        enemyStripeRMesh.count = state.enemies.length;
+        enemyLightMesh.count = state.enemies.length;
+        enemyUnderglowMesh.count = state.enemies.length;
+
+        // Win condition check for all levels (Moved to end of frame)
+        if (state.score >= state.goal) {
+            if (state.lvl === 3) {
+                gameOver("MISSION COMPLETE", "Target score reached! System Overdrive successful.");
+            } else {
+                gameOver("LEVEL CLEAR", "Target score achieved. Proceed to next level.");
+            }
+            return;
+        }
+
+        enemyBodyMesh.instanceMatrix.needsUpdate = true;
+        enemyCabinMesh.instanceMatrix.needsUpdate = true;
+        enemySpoilerMesh.instanceMatrix.needsUpdate = true;
+        enemyStripeLMesh.instanceMatrix.needsUpdate = true;
+        enemyStripeRMesh.instanceMatrix.needsUpdate = true;
+        enemyLightMesh.instanceMatrix.needsUpdate = true;
+        enemyUnderglowMesh.instanceMatrix.needsUpdate = true;
+        
+        if (enemyCabinMesh.instanceColor) enemyCabinMesh.instanceColor.needsUpdate = true;
+        if (enemyStripeLMesh.instanceColor) enemyStripeLMesh.instanceColor.needsUpdate = true;
+        if (enemyStripeRMesh.instanceColor) enemyStripeRMesh.instanceColor.needsUpdate = true;
+        if (enemyLightMesh.instanceColor) enemyLightMesh.instanceColor.needsUpdate = true;
+        if (enemyUnderglowMesh.instanceColor) enemyUnderglowMesh.instanceColor.needsUpdate = true;
+
+        renderer.render(scene, camera);
+        requestAnimationFrame(loop);
+    }
+
+    function gameOver(title, msg) {
+        state.over = true;
+        Audio.stopEngine();
+        Audio.pauseBGM();
+        if (title.includes("COMPLETE") || title.includes("CLEAR")) {
+            Audio.win();
+        } else {
+            Audio.collision();
+        }
+        // Final score update to ensure UI is accurate
+        UI.score.innerText = Math.floor(state.score);
+        UI.over.style.display = 'flex';
+        document.getElementById('over-title').innerText = title;
+        document.getElementById('over-msg').innerText = msg;
+    }
+
+    const move = (dir) => {
+        if (dir === -1 && state.targetLane > 0) state.targetLane--;
+        if (dir === 1 && state.targetLane < LANES - 1) state.targetLane++;
+    };
+
+    document.getElementById('btn-l').onclick = () => move(-1);
+    document.getElementById('btn-r').onclick = () => move(1);
+    const sBtn = document.getElementById('btn-s');
+    sBtn.onmousedown = sBtn.ontouchstart = (e) => { e.preventDefault(); state.isSlow = true; sBtn.classList.add('active-slow'); };
+    sBtn.onmouseup = sBtn.onmouseleave = sBtn.ontouchend = () => { state.isSlow = false; sBtn.classList.remove('active-slow'); };
+
+    UI.mute.onclick = () => {
+        Audio.init();
+        Audio.toggleMute();
+        Audio.click();
+    };
+
+    window.onkeydown = (e) => {
+        Audio.init();
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') move(-1);
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') move(1);
+        if (e.code === 'Space') { state.isSlow = true; sBtn.classList.add('active-slow'); }
+        if (e.code === 'KeyP' || e.code === 'Escape') togglePause();
+    };
+    window.onkeyup = (e) => { if (e.code === 'Space') { state.isSlow = false; sBtn.classList.remove('active-slow'); } };
+
+    UI.restart.onclick = () => {
+        Audio.click();
+        initLevel(state.lvl);
+        requestAnimationFrame(loop);
+    };
+
+    UI.backToMenu.onclick = () => {
+        Audio.click();
+        showMenu();
+    };
+
+    UI.resume.onclick = () => {
+        Audio.click();
+        togglePause();
+    };
+
+    UI.pauseRestart.onclick = () => {
+        Audio.click();
+        togglePause();
+        initLevel(state.lvl);
+    };
+
+    UI.pauseMenu.onclick = () => {
+        Audio.click();
+        showMenu();
+    };
+
+    // Level selection buttons
+    document.querySelectorAll('.menu-btn').forEach(btn => {
+        const originalOnClick = btn.getAttribute('onclick');
+        if (originalOnClick) {
+            const lvlMatch = originalOnClick.match(/\d+/);
+            if (lvlMatch) {
+                const lvl = parseInt(lvlMatch[0]);
+                btn.removeAttribute('onclick');
+                btn.addEventListener('click', () => {
+                    Audio.init();
+                    Audio.click();
+                    startLevel(lvl);
+                });
+            }
+        }
+    });
+
+    window.onresize = () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    };
+
+    // initLevel(1);
+    // requestAnimationFrame(loop);
+</script>
+</body>
+</html>
