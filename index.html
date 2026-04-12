@@ -44,7 +44,7 @@
         #risk-bonus.active { opacity: 1; transform: translateY(0); }
 
         #combo-container {
-            position: absolute; top: 50%; right: 20px; transform: translateY(-50%);
+            position: absolute; top: 150px; right: 20px;
             background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 0, 255, 0.3);
             padding: 10px; border-radius: 4px; display: flex; flex-direction: column; align-items: center;
             opacity: 0; transition: opacity 0.3s, transform 0.3s;
@@ -70,19 +70,24 @@
         }
 
         /* Controls */
-        #controls { display: flex; gap: 15px; pointer-events: auto; align-items: center; }
+        #controls { position: absolute; inset: 0; pointer-events: none; }
         .btn { 
             width: 60px; height: 60px; border-radius: 50%; border: 2px solid #00f2ff;
             background: rgba(0, 242, 255, 0.1); color: #00f2ff; font-size: 20px; cursor: pointer;
             display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);
-            transition: all 0.1s; -webkit-tap-highlight-color: transparent;
+            transition: all 0.1s; -webkit-tap-highlight-color: transparent; pointer-events: auto;
         }
         .btn:active { transform: scale(0.9); background: rgba(0, 242, 255, 0.4); }
         .btn-slow { 
-            width: 120px; border-radius: 10px; border-color: #ff00ff; color: #ff00ff; 
-            font-size: 12px; font-weight: bold; letter-spacing: 1px;
+            border-radius: 30px; border-color: #ff00ff; color: #ff00ff; 
+            font-size: 14px; font-weight: bold; letter-spacing: 1px;
         }
         .active-slow { background: #ff00ff !important; color: #000 !important; box-shadow: 0 0 30px #ff00ff; }
+        
+        #btn-l { position: absolute; top: 50%; left: 20px; transform: translateY(-50%); width: 70px; height: 70px; }
+        #btn-r { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); width: 70px; height: 70px; }
+        #btn-s { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); width: 160px; height: 60px; }
+        #btn-emp { position: absolute; top: 80px; right: 20px; width: 60px; height: 60px; }
 
         /* Overlays */
         #overlay { 
@@ -147,7 +152,7 @@
         .menu-btn.locked span { color: #ff4444; }
 
         /* HUD Extras */
-        #hud-extras { position: absolute; bottom: 100px; left: 20px; display: flex; gap: 8px; }
+        #hud-extras { position: absolute; top: 65px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: none; }
         .extra-box {
             background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(0, 242, 255, 0.2);
             padding: 3px 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px;
@@ -208,9 +213,13 @@
             #menu-overlay h1 { font-size: 36px; letter-spacing: 5px; text-align: center; margin-bottom: 20px; }
             .menu-options { width: 80%; }
             .menu-btn { padding: 10px; font-size: 14px; }
-            .hud-bottom { padding-bottom: 50px; }
-            #hud-extras { bottom: 130px; }
-            #level-tasks { top: 80px; }
+            #btn-l { left: 10px; width: 60px; height: 60px; }
+            #btn-r { right: 10px; width: 60px; height: 60px; }
+            #btn-s { bottom: 30px; width: 140px; height: 50px; }
+            #btn-emp { top: 70px; right: 10px; width: 50px; height: 50px; font-size: 12px !important; }
+            #hud-extras { top: 60px; }
+            #level-tasks { top: 70px; left: 10px; }
+            #combo-container { top: 130px; right: 10px; }
         }
     </style>
 </head>
@@ -268,13 +277,11 @@
             <div id="task-3" class="task-item"><span class="task-star">★</span> <span class="task-text">Task 3</span></div>
         </div>
 
-        <div class="hud-bottom">
-            <div id="controls">
-                <button class="btn" id="btn-l">L</button>
-                <button class="btn" id="btn-emp" style="border-color: #ffcc00; color: #ffcc00; font-size: 14px;">EMP</button>
-                <button class="btn btn-slow" id="btn-s">SLOW-MO</button>
-                <button class="btn" id="btn-r">R</button>
-            </div>
+        <div id="controls">
+            <button class="btn" id="btn-l">L</button>
+            <button class="btn" id="btn-r">R</button>
+            <button class="btn btn-slow" id="btn-s">SLOW-MO</button>
+            <button class="btn" id="btn-emp" style="border-color: #ffcc00; color: #ffcc00; font-size: 14px;">EMP</button>
         </div>
     </div>
 
