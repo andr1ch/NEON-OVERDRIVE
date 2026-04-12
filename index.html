@@ -203,6 +203,15 @@
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
             background-size: 100% 4px, 3px 100%;
         }
+
+        @media (max-width: 600px) {
+            #menu-overlay h1 { font-size: 36px; letter-spacing: 5px; text-align: center; margin-bottom: 20px; }
+            .menu-options { width: 80%; }
+            .menu-btn { padding: 10px; font-size: 14px; }
+            .hud-bottom { padding-bottom: 50px; }
+            #hud-extras { bottom: 130px; }
+            #level-tasks { top: 80px; }
+        }
     </style>
 </head>
 <body>
@@ -305,6 +314,10 @@
                 Neon Shop
                 <span>Upgrade your system</span>
             </button>
+            <button class="menu-btn" onclick="showTutorial()" style="border-color: #00ffcc; color: #00ffcc;">
+                HOW TO PLAY
+                <span>Learn the controls</span>
+            </button>
             <button class="menu-btn sound-on" id="menu-mute-btn">
                 SOUND: ON
             </button>
@@ -378,6 +391,17 @@
         </div>
         <button id="shop-close" class="menu-btn" onclick="closeShop()">Back to Menu</button>
     </div>
+</div>
+
+<div id="tutorial-overlay" style="display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.95); z-index: 300; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; color: #fff;">
+    <h2 style="color: #00ffcc; margin-bottom: 20px;">HOW TO PLAY</h2>
+    <div style="max-width: 400px; font-size: 14px; line-height: 1.5; text-align: left; margin-bottom: 30px;">
+        <p><strong style="color: #00f2ff;">L / R:</strong> Change lanes. Hold to move across multiple lanes.</p>
+        <p><strong style="color: #ff00ff;">SLOW-MO:</strong> Hold to slow down time. Useful for dodging tight spots.</p>
+        <p><strong style="color: #ffcc00;">EMP:</strong> Destroys the nearest car in your current lane. Costs 1 charge.</p>
+        <p><strong style="color: #00ff00;">GOAL:</strong> Reach the target score to clear the level. Near misses and oncoming traffic give bonus points.</p>
+    </div>
+    <button class="menu-btn" onclick="hideTutorial()" style="width: 200px; border-color: #00ffcc; color: #00ffcc;">GOT IT</button>
 </div>
 
 <script>
@@ -1214,7 +1238,7 @@
         
         // Pre-populate with some enemies
         for(let i=0; i<15; i++) {
-            spawnEnemy(-50 - i * 40);
+            spawnEnemy(-100 - i * 40);
         }
 
         UI.over.style.display = 'none';
@@ -1388,6 +1412,16 @@
             UI.menuMute.innerText = muted ? 'SOUND: OFF' : 'SOUND: ON';
         }
     }
+
+    window.showTutorial = () => {
+        document.getElementById('tutorial-overlay').style.display = 'flex';
+        Audio.click();
+    };
+
+    window.hideTutorial = () => {
+        document.getElementById('tutorial-overlay').style.display = 'none';
+        Audio.click();
+    };
 
     window.toggleLevelSelect = () => {
         Audio.init();
@@ -1790,13 +1824,34 @@
         if (dir === 1 && state.targetLane < LANES - 1) state.targetLane++;
     };
 
-    const moveL = (e) => { if (e && e.type === 'touchstart') e.preventDefault(); move(-1); };
-    const moveR = (e) => { if (e && e.type === 'touchstart') e.preventDefault(); move(1); };
+    let moveInterval = null;
+    const startMove = (dir, e) => {
+        if (e && e.type === 'touchstart') e.preventDefault();
+        move(dir);
+        if (moveInterval) clearInterval(moveInterval);
+        moveInterval = setInterval(() => move(dir), 150);
+    };
+    const stopMove = (e) => {
+        if (e && e.type === 'touchend') e.preventDefault();
+        if (moveInterval) clearInterval(moveInterval);
+        moveInterval = null;
+    };
 
-    document.getElementById('btn-l').onclick = moveL;
-    document.getElementById('btn-l').ontouchstart = moveL;
-    document.getElementById('btn-r').onclick = moveR;
-    document.getElementById('btn-r').ontouchstart = moveR;
+    const btnL = document.getElementById('btn-l');
+    const btnR = document.getElementById('btn-r');
+
+    btnL.onmousedown = (e) => startMove(-1, e);
+    btnL.ontouchstart = (e) => startMove(-1, e);
+    btnL.onmouseup = stopMove;
+    btnL.onmouseleave = stopMove;
+    btnL.ontouchend = stopMove;
+
+    btnR.onmousedown = (e) => startMove(1, e);
+    btnR.ontouchstart = (e) => startMove(1, e);
+    btnR.onmouseup = stopMove;
+    btnR.onmouseleave = stopMove;
+    btnR.ontouchend = stopMove;
+
     const sBtn = document.getElementById('btn-s');
     const empBtn = document.getElementById('btn-emp');
 
@@ -1873,6 +1928,7 @@
         if (btn.id && btn.id.startsWith('lvl-btn-')) {
             const lvl = parseInt(btn.id.replace('lvl-btn-', ''));
             btn.addEventListener('click', () => {
+                if (btn.classList.contains('locked')) return;
                 Audio.init();
                 Audio.click();
                 startLevel(lvl);
